@@ -1,5 +1,13 @@
 ---
 license: gpl-3.0
+language:
+- en
+metrics:
+- accuracy
+- recall
+- precision
+- roc_auc
+pipeline_tag: image-classification
 ---
 ## Adversarial Examples for improving the robustness of Eye-State Classification 👁 👁 :
 
@@ -104,4 +112,3 @@ References
 Sefika Efeoglu
 
 Research Project, Data Science MSc, University of Potsdam
-
