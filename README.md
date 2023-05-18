@@ -32,15 +32,15 @@ Using adversarial examples, the project aims to improve the robustness and accur
 
 #### Parseval Network
 
-* [Orthogonality Constraint in Convolutional Layers](/src/models/Parseval_Networks/constraint.py)
-* [Convexity Constraint in Aggregation Layers](/src/models/Parseval_Networks/convexity_constraint.py)
+* [Orthogonality Constraint in Convolutional Layers](https://huggingface.co/Sefika/parseval-network/blob/main/models/Parseval_Networks/constraint.py)
+* [Convexity Constraint in Aggregation Layers](https://huggingface.co/Sefika/parseval-network/blob/main/models/Parseval_Networks/convexity_constraint.py)
 
 #### Convolutional Neural Network
 
 #### Adversarial Examples
 
 ##### Fast Gradient Sign Method
-[Examples](src/visualization/Adversarial_Images.ipynb)
+[Examples](https://huggingface.co/Sefika/parseval-network/blob/main/visualization/Adversarial_Images.ipynb)
 
 ### Evaluation
 
@@ -53,7 +53,7 @@ Using adversarial examples, the project aims to improve the robustness and accur
 
 ``` bash
 
-adversarial_examples_parseval_net/src/models
+adversarial_examples_parseval_net/models
 ├── FullyConectedModels
 │   ├── model.py
 │   └── parseval.py
@@ -70,9 +70,9 @@ adversarial_examples_parseval_net/src/models
 
 ### Final Results:
 
-* [The results of the first approach with FGSM](logs/AEModels/)
-* [The results of the first approach with Random Noise](logs/RandomNoisemodels/)
-* [The results of the second approach](logs/images)
+* [The results of the first approach with FGSM](https://huggingface.co/Sefika/parseval-network/tree/main/logs/AEModels)
+* [The results of the first approach with Random Noise](https://huggingface.co/Sefika/parseval-network/tree/main/logs/RandomNoisemodels)
+* [The results of the second approach](https://huggingface.co/Sefika/parseval-network/tree/main/logs)
 
 
 References
