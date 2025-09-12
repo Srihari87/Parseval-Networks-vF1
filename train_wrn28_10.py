@@ -83,6 +83,8 @@ class WideResNet(nn.Module):
 def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print("Using device:", device)
+    if device == 'cuda':
+        print("GPU:", torch.cuda.get_device_name(0))
 
     # CIFAR-10 data loaders
     transform_train = transforms.Compose([
@@ -92,7 +94,6 @@ def main():
         transforms.Normalize((0.4914, 0.4822, 0.4465),
                              (0.247, 0.243, 0.261)),
     ])
-
     transform_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465),
@@ -105,9 +106,9 @@ def main():
                                            download=True, transform=transform_test)
 
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=128,
-                                              shuffle=True, num_workers=4, pin_memory=True)
+                                              shuffle=True, num_workers=8, pin_memory=True)
     testloader = torch.utils.data.DataLoader(testset, batch_size=256,
-                                             shuffle=False, num_workers=4, pin_memory=True)
+                                             shuffle=False, num_workers=8, pin_memory=True)
 
     # Model, loss, optimizer, scheduler
     model = WideResNet(depth=28, widen_factor=10, num_classes=10, dropRate=0.3).to(device)
@@ -115,29 +116,33 @@ def main():
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[60, 120, 160], gamma=0.2)
 
-    # Helper function to evaluate
+    scaler = torch.cuda.amp.GradScaler()  # ✅ AMP
+
     @torch.no_grad()
     def eval_acc():
         model.eval()
         correct, total = 0, 0
         for x, y in testloader:
             x, y = x.to(device), y.to(device)
-            preds = model(x).argmax(1)
+            with torch.cuda.amp.autocast():
+                preds = model(x).argmax(1)
             total += y.size(0)
             correct += (preds == y).sum().item()
         return 100.0 * correct / total
 
-    # Train
-    for epoch in range(200):   # 🔹 set to 200 for full run
+    # Train for 200 epochs
+    for epoch in range(200):
         model.train()
         running_loss, correct, total = 0.0, 0, 0
         for x, y in trainloader:
             x, y = x.to(device), y.to(device)
             optimizer.zero_grad()
-            logits = model(x)
-            loss = criterion(logits, y)
-            loss.backward()
-            optimizer.step()
+            with torch.cuda.amp.autocast():
+                logits = model(x)
+                loss = criterion(logits, y)
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
             running_loss += loss.item()
             _, predicted = logits.max(1)
@@ -149,8 +154,14 @@ def main():
         print(f"Epoch {epoch+1}/200: Train {train_acc:.2f}% | Test {test_acc:.2f}% | Loss {running_loss/len(trainloader):.3f}")
         scheduler.step()
 
-    # Save model
-    torch.save(model.state_dict(), "wrn28_10_cifar10_e200.pt")
+        # ✅ Save checkpoint every 50 epochs
+        if (epoch+1) % 50 == 0:
+            ckpt_name = f"wrn28_10_epoch{epoch+1}.pt"
+            torch.save(model.state_dict(), ckpt_name)
+            print(f"Saved checkpoint: {ckpt_name}")
+
+    # Final save
+    torch.save(model.state_dict(), "wrn28_10_final.pt")
 
 if __name__ == "__main__":
     main()
