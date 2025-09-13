@@ -43,7 +43,7 @@ def main():
                                                milestones=[60, 120, 160], gamma=0.2)
 
     # Training
-    for epoch in range(5):
+    for epoch in range(200):
         model.train()
         correct, total, running_loss = 0, 0, 0
         for inputs, targets in trainloader:
