@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
-from models.resnet20 import resnet20
 
 def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
