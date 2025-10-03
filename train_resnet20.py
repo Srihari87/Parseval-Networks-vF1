@@ -5,22 +5,23 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
-from models.resnet20 import resnet20   # ✅ make sure this is in your models/ folder
+from models.resnet20 import resnet20   # make sure this exists in models/
 
 # ------------------ Parseval Update ------------------
 def parseval_update(model, beta=0.0003, num_passes=1):
     """
-    Apply Parseval tight frame retraction update.
-    Ensures weight matrices have Lipschitz constant <= 1.
+    Apply Parseval tight frame retraction update:
+        W <- (1 + beta) W - beta W (W^T W)
+    Ensures weight matrices approximate orthogonality (Lipschitz <= 1).
     """
     for module in model.modules():
         if isinstance(module, (nn.Conv2d, nn.Linear)):
             W = module.weight.data
             shape = W.shape
-            W_mat = W.view(shape[0], -1)   # flatten for matmul
+            W_mat = W.view(shape[0], -1)   # flatten (out_channels, in_dim)
 
             for _ in range(num_passes):
-                WT_W = torch.mm(W_mat, W_mat.t())
+                WT_W = torch.mm(W_mat.t(), W_mat)   # (in_dim, in_dim)
                 W_mat = (1 + beta) * W_mat - beta * torch.mm(W_mat, WT_W)
 
             module.weight.data = W_mat.view(shape)
@@ -35,6 +36,8 @@ def main():
                         help="Parseval retraction step size")
     parser.add_argument("--num_passes", type=int, default=1,
                         help="Number of retraction passes per step")
+    parser.add_argument("--restart", action="store_true",
+                        help="Ignore checkpoints and start fresh")
     args = parser.parse_args()
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -78,7 +81,7 @@ def main():
     best_test_acc = 0.0
 
     # ------------------ Resume ------------------
-    if os.path.exists("resnet20_last.pt"):
+    if os.path.exists("resnet20_last.pt") and not args.restart:
         print("Resuming from checkpoint: resnet20_last.pt")
         checkpoint = torch.load("resnet20_last.pt", map_location=device, weights_only=False)
         model.load_state_dict(checkpoint["model_state"])
@@ -86,6 +89,11 @@ def main():
         scheduler.load_state_dict(checkpoint["scheduler_state"])
         start_epoch = checkpoint["epoch"] + 1
         best_test_acc = checkpoint["best_acc"]
+    else:
+        if args.restart:
+            print("Restart flag set → ignoring checkpoints")
+        start_epoch = 0
+        best_test_acc = 0.0
 
     # ------------------ Training ------------------
     for epoch in range(start_epoch, args.epochs):
@@ -100,7 +108,7 @@ def main():
             loss.backward()
             optimizer.step()
 
-            # ✅ Parseval update
+            # ✅ Apply Parseval update
             parseval_update(model, beta=args.beta, num_passes=args.num_passes)
 
             running_loss += loss.item()
