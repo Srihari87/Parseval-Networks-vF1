@@ -80,7 +80,7 @@ def main():
     # ------------------ Resume ------------------
     if os.path.exists("resnet20_last.pt"):
         print("Resuming from checkpoint: resnet20_last.pt")
-        checkpoint = torch.load("resnet20_last.pt", map_location=device)
+        checkpoint = torch.load("resnet20_last.pt", map_location=device, weights_only=False)
         model.load_state_dict(checkpoint["model_state"])
         optimizer.load_state_dict(checkpoint["optimizer_state"])
         scheduler.load_state_dict(checkpoint["scheduler_state"])
