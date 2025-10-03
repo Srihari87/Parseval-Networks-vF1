@@ -1,12 +1,42 @@
 import os
+import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
-from models.resnet20 import resnet20   # ✅ make sure you have the architecture file in models/
+from models.resnet20 import resnet20   # ✅ make sure this is in your models/ folder
 
+# ------------------ Parseval Update ------------------
+def parseval_update(model, beta=0.0003, num_passes=1):
+    """
+    Apply Parseval tight frame retraction update.
+    Ensures weight matrices have Lipschitz constant <= 1.
+    """
+    for module in model.modules():
+        if isinstance(module, (nn.Conv2d, nn.Linear)):
+            W = module.weight.data
+            shape = W.shape
+            W_mat = W.view(shape[0], -1)   # flatten for matmul
+
+            for _ in range(num_passes):
+                WT_W = torch.mm(W_mat, W_mat.t())
+                W_mat = (1 + beta) * W_mat - beta * torch.mm(W_mat, WT_W)
+
+            module.weight.data = W_mat.view(shape)
+
+# ------------------ Training Script ------------------
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--epochs", type=int, default=200)
+    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--lr", type=float, default=0.1)
+    parser.add_argument("--beta", type=float, default=0.0003,
+                        help="Parseval retraction step size")
+    parser.add_argument("--num_passes", type=int, default=1,
+                        help="Number of retraction passes per step")
+    args = parser.parse_args()
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print("Using device:", device)
     if device == 'cuda':
@@ -28,7 +58,7 @@ def main():
 
     trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                             download=True, transform=transform_train)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=128,
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size,
                                               shuffle=True, num_workers=4, pin_memory=True)
 
     testset = torchvision.datasets.CIFAR10(root='./data', train=False,
@@ -39,7 +69,7 @@ def main():
     # ------------------ Model ------------------
     model = resnet20().to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.1,
+    optimizer = optim.SGD(model.parameters(), lr=args.lr,
                           momentum=0.9, weight_decay=5e-4)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer,
                                                milestones=[60, 120, 160], gamma=0.2)
@@ -58,7 +88,7 @@ def main():
         best_test_acc = checkpoint["best_acc"]
 
     # ------------------ Training ------------------
-    for epoch in range(start_epoch, 200):
+    for epoch in range(start_epoch, args.epochs):
         model.train()
         correct, total, running_loss = 0, 0, 0
 
@@ -69,6 +99,9 @@ def main():
             loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
+
+            # ✅ Parseval update
+            parseval_update(model, beta=args.beta, num_passes=args.num_passes)
 
             running_loss += loss.item()
             _, predicted = outputs.max(1)
@@ -89,7 +122,7 @@ def main():
                 correct += predicted.eq(targets).sum().item()
         test_acc = 100. * correct / total
 
-        print(f"Epoch {epoch+1}/200: "
+        print(f"Epoch {epoch+1}/{args.epochs}: "
               f"Train {train_acc:.2f}% | "
               f"Test {test_acc:.2f}% | "
               f"Loss {running_loss/len(trainloader):.3f}")
